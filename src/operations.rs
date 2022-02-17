@@ -191,15 +191,13 @@ mod tests {
     #[test]
     #[cfg(feature = "mceliece8192128f")]
     pub fn test_crypto_kem_dec() -> Result<(), Box<dyn error::Error>> {
-        use crate::{
-            api::{CRYPTO_CIPHERTEXTBYTES, CRYPTO_SECRETKEYBYTES},
-        };
+        let cme = crate::ClassicMcEliece::mceliece8192128f();
 
         let mut sk = crate::TestData::new().u8vec("mceliece8192128f_sk1");
-        assert_eq!(sk.len(), CRYPTO_SECRETKEYBYTES + 40);
+        assert_eq!(sk.len(), cme.CRYPTO_SECRETKEYBYTES + 40);
 
         let mut c = crate::TestData::new().u8vec("mceliece8192128f_ct1");
-        assert_eq!(c.len(), CRYPTO_CIPHERTEXTBYTES);
+        assert_eq!(c.len(), cme.CRYPTO_CIPHERTEXTBYTES);
 
         let mut test_key = [0u8; 32];
 
@@ -215,14 +213,12 @@ mod tests {
     #[test]
     #[cfg(feature = "mceliece8192128f")]
     pub fn test_crypto_kem_enc() -> Result<(), Box<dyn error::Error>> {
-        use crate::{
-            api::{CRYPTO_BYTES, CRYPTO_CIPHERTEXTBYTES, CRYPTO_PUBLICKEYBYTES},
-        };
+        let cme = crate::ClassicMcEliece::mceliece8192128f();
 
-        let mut c = [0u8; CRYPTO_CIPHERTEXTBYTES];
-        let mut ss = [0u8; CRYPTO_BYTES];
+        let mut c = [0u8; cme.CRYPTO_CIPHERTEXTBYTES];
+        let mut ss = [0u8; cme.CRYPTO_BYTES];
         let mut pk = crate::TestData::new().u8vec("mceliece8192128f_pk1");
-        assert_eq!(pk.len(), CRYPTO_PUBLICKEYBYTES);
+        assert_eq!(pk.len(), cme.CRYPTO_PUBLICKEYBYTES);
 
         let compare_ss = crate::TestData::new().u8vec("mceliece8192128f_operations_ss");
         let compare_ct = crate::TestData::new().u8vec("mceliece8192128f_operations_enc1_ct");
@@ -251,23 +247,21 @@ mod tests {
     #[test]
     #[cfg(feature = "mceliece8192128f")]
     pub fn test_crypto_kem_keypair() -> Result<(), Box<dyn error::Error>> {
-        use crate::{
-            api::{CRYPTO_PUBLICKEYBYTES, CRYPTO_SECRETKEYBYTES},
-        };
+        let cme = crate::ClassicMcEliece::mceliece8192128f();
 
-        let mut pk_input = [0; CRYPTO_PUBLICKEYBYTES].to_vec();
-        assert_eq!(pk_input.len(), CRYPTO_PUBLICKEYBYTES);
+        let mut pk_input: <cme as crate::Data>::PublicKey;//  [0; cme.publickeybytes()].to_vec();
+        assert_eq!(pk_input.len(), cme.publickeybytes());
 
-        let mut sk_input = [0; CRYPTO_SECRETKEYBYTES].to_vec();
-        assert_eq!(sk_input.len(), CRYPTO_SECRETKEYBYTES);
+        let mut sk_input = [0; cme.CRYPTO_SECRETKEYBYTES].to_vec();
+        assert_eq!(sk_input.len(), cme.CRYPTO_SECRETKEYBYTES);
 
         let entropy_input = <[u8; 48]>::try_from(crate::TestData::new().u8vec("mceliece8192128f_operations_entropy_input").as_slice()).unwrap();
 
         let compare_sk = crate::TestData::new().u8vec("mceliece8192128f_operations_sk_expected");
-        assert_eq!(compare_sk.len(), CRYPTO_SECRETKEYBYTES);
+        assert_eq!(compare_sk.len(), cme.CRYPTO_SECRETKEYBYTES);
 
         let compare_pk = crate::TestData::new().u8vec("mceliece8192128f_operations_pk_expected");
-        assert_eq!(compare_pk.len(), CRYPTO_PUBLICKEYBYTES);
+        assert_eq!(compare_pk.len(), cme.CRYPTO_PUBLICKEYBYTES);
 
         let mut rng_state = AesState::new();
         rng_state.randombytes_init(entropy_input);

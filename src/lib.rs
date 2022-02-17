@@ -1,4 +1,5 @@
-mod api;
+#![feature(generic_const_exprs)]
+
 mod benes;
 mod bm;
 mod controlbits;
@@ -18,13 +19,8 @@ mod transpose;
 mod uint64_sort;
 mod util;
 
+pub use params::ClassicMcEliece;
 pub use randombytes::{AesState, RNGState};
-pub use operations::{crypto_kem_dec, crypto_kem_enc, crypto_kem_keypair};
-pub use api::{
-    CRYPTO_BYTES, CRYPTO_PUBLICKEYBYTES,
-    CRYPTO_SECRETKEYBYTES, CRYPTO_CIPHERTEXTBYTES,
-    CRYPTO_PRIMITIVE
-};
 
 #[cfg(test)]
 macro_rules! impl_parser_per_type {
@@ -123,6 +119,8 @@ mod tests {
 
     #[test]
     fn test_kat_tests() -> Result<(), Box<dyn Error>> {
+        let cme = crate::ClassicMcEliece::mceliece8192128f();
+
         const KATNUM: usize = 10;
         let mut rng = AesState::new();
 
@@ -145,7 +143,7 @@ mod tests {
         }
 
         let fp_rsp = &mut File::create("kat_kem.rsp")?;
-        writeln!(fp_rsp, "# kem/{}\n", api::CRYPTO_PRIMITIVE)?;
+        writeln!(fp_rsp, "# kem/{}\n", cme.CRYPTO_PRIMITIVE)?;
 
         for i in 0..KATNUM {
             kat_test_response(fp_rsp, i, seed[i])?;
@@ -165,11 +163,13 @@ mod tests {
     }
 
     fn kat_test_response(fp_rsp: &mut File, i: usize, seed: [u8; 48]) -> Result<(), Box<dyn Error>> {
-        let mut ct = [0u8; api::CRYPTO_CIPHERTEXTBYTES];
-        let mut ss = [0u8; api::CRYPTO_BYTES];
-        let mut ss1 = [0u8; api::CRYPTO_BYTES];
-        let mut pk = vec![0u8; api::CRYPTO_PUBLICKEYBYTES];
-        let mut sk = vec![0u8; api::CRYPTO_SECRETKEYBYTES];
+        let cme = crate::ClassicMcEliece::mceliece8192128f();
+
+        let mut ct = [0u8; cme.CRYPTO_CIPHERTEXTBYTES];
+        let mut ss = [0u8; cme.CRYPTO_BYTES];
+        let mut ss1 = [0u8; cme.CRYPTO_BYTES];
+        let mut pk = vec![0u8; cme.CRYPTO_PUBLICKEYBYTES];
+        let mut sk = vec![0u8; cme.CRYPTO_SECRETKEYBYTES];
         let mut rng = AesState::new();
 
         rng.randombytes_init(seed);

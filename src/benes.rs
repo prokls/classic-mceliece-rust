@@ -5,13 +5,11 @@
 //! <https://eprint.iacr.org/2017/793.pdf>
 
 use crate::gf::Gf;
-use crate::params::GFBITS;
-use crate::params::SYS_N;
 use crate::transpose;
 use crate::util;
 
-/// Layers of the Beneš network
-#[cfg(any(feature = "mceliece348864", feature = "mceliece348864f"))]
+/// Layers of the Beneš network.
+/// Used in the variants mceliece348864 and mceliece348864f.
 fn layer(data: &mut [u64; 64], bits: &[u64], lgs: usize) {
     let mut d: u64;
     let mut index = 0;
@@ -32,8 +30,8 @@ fn layer(data: &mut [u64; 64], bits: &[u64], lgs: usize) {
     }
 }
 
-/// Inner layers of the Beneš network
-#[cfg(not(any(feature = "mceliece348864", feature = "mceliece348864f")))]
+/// Inner layers of the Beneš network.
+/// Used in the variants different from mceliece348864 and mceliece348864f.
 fn layer_in(data: &mut [[u64; 64]; 2], bits: &[u64], lgs: usize) {
     let mut d: u64;
     let mut index = 0;
@@ -65,8 +63,8 @@ fn layer_in(data: &mut [[u64; 64]; 2], bits: &[u64], lgs: usize) {
 // TODO this implementation is quite different from the C implementation
 // attempt maybe iterators
 // for item in 2darray.iter().flatten() { … }
-// or try https://docs.rs/bytemuck/1.7.2/bytemuck/ crate
-#[cfg(not(any(feature = "mceliece348864", feature = "mceliece348864f")))]
+// or try https://docs.rs/bytemuck/1.7.2/bytemuck/ crate.
+/// Used in the variants different from mceliece348864 and mceliece348864f.
 fn layer_ex(data: &mut [[u64; 64]; 2], bits: &mut [u64], lgs: usize) {
     let mut d: u64;
     let mut index = 0;
@@ -109,8 +107,8 @@ fn layer_ex(data: &mut [[u64; 64]; 2], bits: &mut [u64], lgs: usize) {
 /// Here, `r` is a sequence of bits to be permuted.
 /// `bits` defines the condition bits configuring the Beneš network and
 /// `rev` toggles between normal application (0) or its inverse (!0).
-#[cfg(any(feature = "mceliece348864", feature = "mceliece348864f"))]
-pub fn apply_benes(r: &mut [u8; (1 << GFBITS) / 8], bits: &[u8], rev: usize) {
+/// Used in the variants mceliece348864 and mceliece348864f (“small”).
+pub fn apply_benes_small<const GFBITS: usize>(r: &mut [u8; (1 << GFBITS) / 8], bits: &[u8], rev: usize) {
     let mut bs = [0u64; 64];
     let mut cond = [0u64; 64];
 
@@ -212,8 +210,8 @@ pub fn apply_benes(r: &mut [u8; (1 << GFBITS) / 8], bits: &[u8], rev: usize) {
 /// Here, `r` is a sequence of bits to be permuted.
 /// `bits` defines the condition bits configuring the Beneš network and
 /// `rev` toggles between normal application (0) or its inverse (!0).
-#[cfg(not(any(feature = "mceliece348864", feature = "mceliece348864f")))]
-pub fn apply_benes(r: &mut [u8; (1 << GFBITS) / 8], bits: &[u8], rev: usize) {
+/// Used in the variants different from mceliece348864 and mceliece348864f (“big”).
+pub fn apply_benes_big<const GFBITS: usize>(r: &mut [u8; (1 << GFBITS) / 8], bits: &[u8], rev: usize) {
     let mut r_int_v = [[0u64; 64]; 2];
     let mut r_int_h = [[0u64; 64]; 2];
     let mut b_int_v = [0u64; 64];
@@ -318,7 +316,18 @@ pub fn apply_benes(r: &mut [u8; (1 << GFBITS) / 8], bits: &[u8], rev: usize) {
     }
 }
 
-pub fn support_gen(s: &mut [Gf; SYS_N], c: &[u8]) {
+/// Apply Beneš network in-place to array `r` based on configuration `bits` and `rev`.
+/// Here, `r` is a sequence of bits to be permuted.
+/// `bits` defines the condition bits configuring the Beneš network and
+/// `rev` toggles between normal application (0) or its inverse (!0).
+pub fn apply_benes<const GFBITS: usize>(r: &mut [u8], bits: &[u8], rev: usize) {
+    match GFBITS {
+        12 => apply_benes_small(r, bits, rev),
+        _ => apply_benes_big(r, bits, rev),
+    }
+}
+
+pub fn support_gen<const SYS_N: usize, const GFBITS: usize>(s: &mut [Gf; SYS_N], c: &[u8]) {
     let mut a: Gf;
     let mut l = [[0u8; (1 << GFBITS) / 8]; GFBITS];
 
@@ -347,7 +356,6 @@ pub fn support_gen(s: &mut [Gf; SYS_N], c: &[u8]) {
 mod tests {
     use super::*;
     use std::convert::TryFrom;
-    use crate::api::{CRYPTO_SECRETKEYBYTES, CRYPTO_PRIMITIVE};
 
     #[test]
     fn test_apply_benes() {
@@ -367,15 +375,15 @@ mod tests {
 
     #[test]
     fn test_layer_in() {
-        let get = |name: &str| {
-            let fullname = format!("{}_{}", CRYPTO_PRIMITIVE, name);
-            crate::TestData::new().u64vec(&fullname)
-        };
-        let get64 = |name: &str| {
-            <[u64; 64]>::try_from(get(name).as_slice()).unwrap()
-        };
-        #[cfg(any(feature = "mceliece348864", feature = "mceliece348864f"))]
-        {
+        let test_348864 = |variant: &str| {
+            let get = |name: &str| {
+                let fullname = format!("{}_{}", variant, name);
+                crate::TestData::new().u64vec(&fullname)
+            };
+            let get64 = |name: &str| {
+                <[u64; 64]>::try_from(get(name).as_slice()).unwrap()
+            };
+
             let mut data_arg = get64("benes_layer_data_before");
             let bits_arg = get("benes_layer_bits");
             layer(&mut data_arg, &bits_arg, 0);
@@ -384,9 +392,17 @@ mod tests {
             let expected_data = get64("benes_layer_data_after");
 
             assert_eq!(actual_data, expected_data);
-        }
-        #[cfg(not(any(feature = "mceliece348864", feature = "mceliece348864f")))]
-        {
+        };
+
+        let test_other = |variant: &str| {
+            let get = |name: &str| {
+                let fullname = format!("{}_{}", variant, name);
+                crate::TestData::new().u64vec(&fullname)
+            };
+            let get64 = |name: &str| {
+                <[u64; 64]>::try_from(get(name).as_slice()).unwrap()
+            };
+
             let data0_arg = get64("benes_layer_in_data0_before");
             let data1_arg = get64("benes_layer_in_data1_before");
             let mut data_arg = [data0_arg, data1_arg];
@@ -399,6 +415,28 @@ mod tests {
             let expected_data = [expected_data0, expected_data1];
 
             assert_eq!(actual_data, expected_data);
-        }
+        };
+
+        let cme348864 = crate::ClassicMcEliece::mceliece348864();
+        test_348864(cme348864.crypto_primitive);
+        let cme348864f = crate::ClassicMcEliece::mceliece348864f();
+        test_348864(cme348864f.crypto_primitive);
+
+        let cme460896 = crate::ClassicMcEliece::mceliece460896();
+        test_other(cme460896.crypto_primitive);
+        let cme460896f = crate::ClassicMcEliece::mceliece460896f();
+        test_other(cme460896f.crypto_primitive);
+        let cme6688128 = crate::ClassicMcEliece::mceliece6688128();
+        test_other(cme6688128.crypto_primitive);
+        let cme6688128f = crate::ClassicMcEliece::mceliece6688128f();
+        test_other(cme6688128f.crypto_primitive);
+        let cme6960119 = crate::ClassicMcEliece::mceliece6960119();
+        test_other(cme6960119.crypto_primitive);
+        let cme6960119f = crate::ClassicMcEliece::mceliece6960119f();
+        test_other(cme6960119f.crypto_primitive);
+        let cme8192128 = crate::ClassicMcEliece::mceliece8192128();
+        test_other(cme8192128.crypto_primitive);
+        let cme8192128f = crate::ClassicMcEliece::mceliece8192128f();
+        test_other(cme8192128f.crypto_primitive);
     }
 }
